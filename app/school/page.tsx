@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+type MaintenanceAlert = { id: number; registration: string; item: string; dueDate: string; overdue: boolean };
 type Overview = {
   school: { id: number; name: string; createdAt: string };
   instructorCount: number;
   studentCount: number;
   sharingCount: number;
   assignedCount: number;
+  maintenanceAlerts: MaintenanceAlert[];
 };
 
 export default function SchoolDashboardPage() {
@@ -45,6 +47,28 @@ export default function SchoolDashboardPage() {
           </div>
         ))}
       </div>
+
+      {data && data.maintenanceAlerts.length > 0 && (
+        <div className="mt-8 rounded-lg border-2 border-gold-500 bg-gold-500/10 p-5 shadow-sm">
+          <h2 className="font-display text-lg font-semibold text-navy-900">Maintenance due soon</h2>
+          <ul className="mt-3 space-y-1.5">
+            {data.maintenanceAlerts.map((a, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-semibold text-ink">
+                  {a.registration} — {a.item}
+                </span>
+                <span className={a.overdue ? "font-semibold text-red-700" : "text-gold-700"}>
+                  {a.overdue ? "Overdue" : "Due"}{" "}
+                  {new Date(a.dueDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Link href="/school/aircraft" className="mt-3 inline-block text-xs font-semibold text-navy-800 hover:underline">
+            Manage fleet →
+          </Link>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         <Link

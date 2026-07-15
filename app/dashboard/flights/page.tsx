@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import CurrencyWidget from "@/components/dashboard/CurrencyWidget";
 
 type FlightRow = {
   id: number;
@@ -15,6 +17,7 @@ type FlightRow = {
   cancelNote: string | null;
   cancelledAt: string | null;
   hoursLogged: number | null;
+  hoursRole: string | null;
 };
 type FlightsData = {
   upcoming: FlightRow[];
@@ -39,6 +42,7 @@ function fmtRange(startsAt: string, endsAt: string) {
 
 function HoursForm({ booking, onLogged }: { booking: FlightRow; onLogged: () => void }) {
   const [hours, setHours] = useState("");
+  const [role, setRole] = useState("dual");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +54,7 @@ function HoursForm({ booking, onLogged }: { booking: FlightRow; onLogged: () => 
       const res = await fetch("/api/student/flights/log-hours", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: booking.id, hours: Number(hours) }),
+        body: JSON.stringify({ bookingId: booking.id, hours: Number(hours), role }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -78,6 +82,15 @@ function HoursForm({ booking, onLogged }: { booking: FlightRow; onLogged: () => 
         placeholder="Hours"
         className="w-24 rounded border border-line px-2.5 py-1.5 text-sm"
       />
+      <select
+        value={role}
+        onChange={(e) => setRole(e.target.value)}
+        className="rounded border border-line px-2.5 py-1.5 text-sm"
+      >
+        <option value="dual">Dual</option>
+        <option value="solo">Solo</option>
+        <option value="pic">PIC</option>
+      </select>
       <button
         type="submit"
         disabled={busy}
@@ -123,7 +136,9 @@ export default function StudentFlightsPage() {
         Your upcoming flights and logged hours with your school.
       </p>
 
-      <div className="mt-4 grid grid-cols-3 gap-4">
+      <CurrencyWidget />
+
+      <div className="mt-8 grid grid-cols-3 gap-4">
         <div className="rounded-lg border border-line bg-white p-4 text-center shadow-sm">
           <p className="font-display text-2xl font-semibold text-navy-900">{data.upcoming.length}</p>
           <p className="mt-0.5 text-xs uppercase tracking-wider text-ink-soft">Upcoming</p>
@@ -201,13 +216,23 @@ export default function StudentFlightsPage() {
 
       {/* History */}
       <section className="mt-8">
-        <h2 className="font-display text-lg font-semibold text-navy-900">Flight history</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-lg font-semibold text-navy-900">Flight history</h2>
+          {data.history.length > 0 && (
+            <Link
+              href="/dashboard/logbook"
+              className="text-xs font-semibold text-navy-800 hover:underline"
+            >
+              View full logbook →
+            </Link>
+          )}
+        </div>
         {data.history.length === 0 ? (
           <p className="mt-2 text-sm text-ink-soft">No logged flights yet.</p>
         ) : (
           <div className="mt-3 overflow-hidden rounded-lg border border-line bg-white shadow-sm">
             <ul className="divide-y divide-line">
-              {data.history.map((f) => (
+              {data.history.slice(0, 5).map((f) => (
                 <li key={f.id} className="flex items-center justify-between gap-3 px-5 py-3">
                   <div>
                     <p className="text-sm font-medium text-ink">

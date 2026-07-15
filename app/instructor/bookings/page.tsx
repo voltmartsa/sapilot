@@ -1,13 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import BookingCalendar, {
   type CalendarBooking,
   getCalendarRange,
   navigateAnchor,
 } from "@/components/BookingCalendar";
 
-type AircraftRow = { id: number; registration: string; type: string; status: string };
+type AircraftRow = {
+  id: number;
+  registration: string;
+  type: string;
+  status: string;
+  arcExpiry: string | null;
+  insuranceExpiry: string | null;
+  nextInspectionDue: string | null;
+};
+
+const MAINTENANCE_WINDOW_DAYS = 30;
+
+function maintenanceWarning(a: AircraftRow): string | null {
+  const now = Date.now();
+  const items: [string, string | null][] = [
+    ["ARC", a.arcExpiry],
+    ["insurance", a.insuranceExpiry],
+    ["inspection", a.nextInspectionDue],
+  ];
+  for (const [label, dateStr] of items) {
+    if (!dateStr) continue;
+    const days = Math.ceil((new Date(dateStr).getTime() - now) / (1000 * 60 * 60 * 24));
+    if (days < 0) return `${label} overdue`;
+    if (days <= MAINTENANCE_WINDOW_DAYS) return `${label} due in ${days}d`;
+  }
+  return null;
+}
 type StudentRow = { id: number; name: string };
 type BookingRow = CalendarBooking & {
   studentName: string;
@@ -65,6 +91,8 @@ export default function InstructorBookingsPage() {
   const [startsAt, setStartsAt] = useState(toLocalInputValue(defaultStart));
   const [endsAt, setEndsAt] = useState(toLocalInputValue(defaultEnd));
   const [purpose, setPurpose] = useState("");
+  const [slotPicked, setSlotPicked] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Cancel modal
   const [cancelTarget, setCancelTarget] = useState<BookingRow | null>(null);
@@ -106,6 +134,20 @@ export default function InstructorBookingsPage() {
 
   const availableAircraft = aircraftList.filter((a) => a.status === "available");
 
+  function handleSlotClick(pickedAircraftId: number, slotStart: Date, slotEnd: Date) {
+    setAircraftId(String(pickedAircraftId));
+    setStartsAt(toLocalInputValue(slotStart));
+    setEndsAt(toLocalInputValue(slotEnd));
+    setSlotPicked(true);
+    setNote(null);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function handleDaySelect(date: Date) {
+    setView("day");
+    setAnchorDate(date);
+  }
+
   async function submitRequest(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -130,6 +172,7 @@ export default function InstructorBookingsPage() {
       }
       setNote("Request sent to your school for approval.");
       setPurpose("");
+      setSlotPicked(false);
       loadMine();
       loadCalendar();
     } catch {
@@ -195,23 +238,41 @@ export default function InstructorBookingsPage() {
         Request an aircraft, see the shared schedule, and manage your flights.
       </p>
 
-      <form onSubmit={submitRequest} className="mt-6 rounded-lg border-2 border-navy-900 bg-white p-5 shadow-sm">
-        <h2 className="font-display text-base font-semibold text-navy-900">Request a booking</h2>
+      <form
+        ref={formRef}
+        onSubmit={submitRequest}
+        className="mt-6 rounded-lg border-2 border-navy-900 bg-white p-5 shadow-sm"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-display text-base font-semibold text-navy-900">Request a booking</h2>
+          {slotPicked && (
+            <span className="rounded bg-gold-500/20 px-2.5 py-1 text-xs font-semibold text-gold-700">
+              Time slot picked from the calendar — review and send below.
+            </span>
+          )}
+        </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-xs font-semibold text-ink">
             Aircraft
             <select
               required
               value={aircraftId}
-              onChange={(e) => setAircraftId(e.target.value)}
+              onChange={(e) => {
+                setAircraftId(e.target.value);
+                setSlotPicked(false);
+              }}
               className="mt-1 w-full rounded border border-line px-3 py-2 text-sm font-normal"
             >
               <option value="">Select…</option>
-              {availableAircraft.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.registration} — {a.type}
-                </option>
-              ))}
+              {availableAircraft.map((a) => {
+                const warning = maintenanceWarning(a);
+                return (
+                  <option key={a.id} value={a.id}>
+                    {a.registration} — {a.type}
+                    {warning ? ` ⚠ ${warning}` : ""}
+                  </option>
+                );
+              })}
             </select>
           </label>
           <label className="text-xs font-semibold text-ink">
@@ -283,6 +344,8 @@ export default function InstructorBookingsPage() {
           bookings={calendarBookings}
           onNavigate={(dir) => setAnchorDate((d) => navigateAnchor(view, d, dir))}
           onViewChange={setView}
+          onSlotClick={handleSlotClick}
+          onDaySelect={handleDaySelect}
         />
       </div>
 

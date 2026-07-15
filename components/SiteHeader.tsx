@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type Me = { id: number; email: string; name: string; role: string } | null;
 
@@ -27,8 +28,11 @@ export function Roundel({ className = "h-8 w-8" }: { className?: string }) {
 }
 
 export default function SiteHeader() {
+  const router = useRouter();
   const [me, setMe] = useState<Me>(null);
   const [loaded, setLoaded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +50,31 @@ export default function SiteHeader() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onPointerDown(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  async function signOut() {
+    setMenuOpen(false);
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/");
+    router.refresh();
+  }
+
   return (
     <header className="sticky top-0 z-40 border-b border-navy-800 bg-navy-900 text-white shadow-sm">
       <div className="h-0.5 bg-gold-500" />
@@ -62,16 +91,69 @@ export default function SiteHeader() {
         {!loaded ? (
           <span className="h-8 w-24" aria-hidden="true" />
         ) : me ? (
-          <Link
-            href={homeFor(me.role)}
-            className="flex items-center gap-2 rounded px-3 py-2 text-sm font-medium text-navy-100/90 transition-colors hover:bg-navy-800 hover:text-white"
-            title={me.email}
-          >
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gold-500 text-xs font-bold text-navy-950">
-              {me.name.trim().charAt(0).toUpperCase()}
-            </span>
-            Profile
-          </Link>
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className="flex items-center gap-2 rounded px-3 py-2 text-sm font-medium text-navy-100/90 transition-colors hover:bg-navy-800 hover:text-white"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gold-500 text-xs font-bold text-navy-950">
+                {me.name.trim().charAt(0).toUpperCase()}
+              </span>
+              Profile
+              <svg
+                viewBox="0 0 16 16"
+                className={`h-3 w-3 transition-transform ${menuOpen ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            {menuOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-lg border border-line bg-white text-ink shadow-xl"
+              >
+                <div className="border-b border-line px-4 py-3">
+                  <p className="truncate text-sm font-semibold text-navy-900">{me.name}</p>
+                  <p className="truncate text-xs text-ink-soft">{me.email}</p>
+                </div>
+                <div className="py-1">
+                  <Link
+                    href={homeFor(me.role)}
+                    role="menuitem"
+                    onClick={() => setMenuOpen(false)}
+                    className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-navy-50"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href={`${homeFor(me.role)}/settings`}
+                    role="menuitem"
+                    onClick={() => setMenuOpen(false)}
+                    className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-navy-50"
+                  >
+                    Settings
+                  </Link>
+                </div>
+                <div className="border-t border-line py-1">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void signOut()}
+                    className="block w-full px-4 py-2 text-left text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                  >
+                    Log out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           <nav className="flex items-center gap-1">
             <Link

@@ -12,7 +12,7 @@ export type CalendarBooking = {
   isMine?: boolean;
 };
 
-type AircraftLite = { id: number; registration: string; type: string };
+type AircraftLite = { id: number; registration: string; type: string; status?: string };
 
 const DAY_START = 6;
 const DAY_END = 19; // 06:00–19:00 window
@@ -71,6 +71,8 @@ export default function BookingCalendar({
   onNavigate,
   onViewChange,
   onBookingClick,
+  onSlotClick,
+  onDaySelect,
 }: {
   view: "day" | "week";
   anchorDate: Date;
@@ -79,6 +81,10 @@ export default function BookingCalendar({
   onNavigate: (direction: "prev" | "next" | "today") => void;
   onViewChange: (view: "day" | "week") => void;
   onBookingClick?: (booking: CalendarBooking) => void;
+  /** Fired when an empty 1-hour cell is clicked in day view, to pre-fill a booking request. */
+  onSlotClick?: (aircraftId: number, startsAt: Date, endsAt: Date) => void;
+  /** Fired when a day header is clicked in week view, to jump into day view for that date. */
+  onDaySelect?: (date: Date) => void;
 }) {
   const days =
     view === "day"
@@ -90,6 +96,7 @@ export default function BookingCalendar({
         });
 
   const hourMarks = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => DAY_START + i);
+  const slotHours = hourMarks.slice(0, -1);
 
   return (
     <div className="rounded-lg border border-line bg-white shadow-sm">
@@ -166,6 +173,28 @@ export default function BookingCalendar({
                     <p className="text-[11px] text-ink-soft">{ac.type}</p>
                   </div>
                   <div className="relative flex-1" style={{ height: 56 }}>
+                    {onSlotClick &&
+                      ac.status === "available" &&
+                      slotHours.map((h) => {
+                        const span = DAY_END - DAY_START;
+                        const left = ((h - DAY_START) / span) * 100;
+                        const width = (1 / span) * 100;
+                        const slotStart = new Date(anchorDate);
+                        slotStart.setHours(h, 0, 0, 0);
+                        const slotEnd = new Date(slotStart);
+                        slotEnd.setHours(h + 1);
+                        return (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => onSlotClick(ac.id, slotStart, slotEnd)}
+                            title={`Book ${ac.registration} ${String(h).padStart(2, "0")}:00–${String(h + 1).padStart(2, "0")}:00`}
+                            aria-label={`Book ${ac.registration} ${String(h).padStart(2, "0")}:00 to ${String(h + 1).padStart(2, "0")}:00`}
+                            className="absolute top-0 h-full border-r border-line/40 last:border-r-0 transition-colors hover:bg-gold-500/15"
+                            style={{ left: `${left}%`, width: `${width}%` }}
+                          />
+                        );
+                      })}
                     {dayBookings.map((b) => {
                       const s = new Date(b.startsAt);
                       const e = new Date(b.endsAt);
@@ -199,12 +228,25 @@ export default function BookingCalendar({
         <div className="overflow-x-auto">
           <div className="grid min-w-[840px] grid-cols-[8rem_repeat(7,1fr)]">
             <div className="border-b border-r border-line" />
-            {days.map((d) => (
-              <div key={d.toISOString()} className="border-b border-line px-2 py-2 text-center text-xs font-semibold text-ink">
-                {d.toLocaleDateString("en-ZA", { weekday: "short" })}
-                <span className="ml-1 text-ink-soft">{d.getDate()}</span>
-              </div>
-            ))}
+            {days.map((d) =>
+              onDaySelect ? (
+                <button
+                  key={d.toISOString()}
+                  type="button"
+                  onClick={() => onDaySelect(d)}
+                  title="Open day view to pick a time slot"
+                  className="border-b border-line px-2 py-2 text-center text-xs font-semibold text-ink transition-colors hover:bg-gold-500/15 hover:text-navy-900"
+                >
+                  {d.toLocaleDateString("en-ZA", { weekday: "short" })}
+                  <span className="ml-1 text-ink-soft">{d.getDate()}</span>
+                </button>
+              ) : (
+                <div key={d.toISOString()} className="border-b border-line px-2 py-2 text-center text-xs font-semibold text-ink">
+                  {d.toLocaleDateString("en-ZA", { weekday: "short" })}
+                  <span className="ml-1 text-ink-soft">{d.getDate()}</span>
+                </div>
+              ),
+            )}
             {aircraftList.map((ac) => (
               <div key={ac.id} className="contents">
                 <div className="border-b border-r border-line px-3 py-3">
@@ -216,12 +258,19 @@ export default function BookingCalendar({
                     (b) => b.aircraftId === ac.id && sameDay(new Date(b.startsAt), d),
                   );
                   return (
-                    <div key={d.toISOString()} className="min-h-[64px] space-y-1 border-b border-l border-line p-1.5">
+                    <div
+                      key={d.toISOString()}
+                      onClick={() => onDaySelect?.(d)}
+                      className={`min-h-[64px] space-y-1 border-b border-l border-line p-1.5 ${onDaySelect ? "cursor-pointer transition-colors hover:bg-gold-500/10" : ""}`}
+                    >
                       {cellBookings.map((b) => (
                         <button
                           key={b.id}
                           type="button"
-                          onClick={() => onBookingClick?.(b)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onBookingClick?.(b);
+                          }}
                           className={`block w-full truncate rounded px-1.5 py-1 text-left text-[10px] font-semibold ${statusStyle(b.status, b.isMine)}`}
                           title={`${fmtTime(b.startsAt)}–${fmtTime(b.endsAt)} · ${b.studentName ?? ""}`}
                         >
@@ -247,6 +296,8 @@ export default function BookingCalendar({
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm bg-navy-900 ring-2 ring-navy-900" /> Yours
         </span>
+        {onSlotClick && view === "day" && <span>Click an empty hour to start a booking request.</span>}
+        {onDaySelect && view === "week" && <span>Click a day to pick an exact time slot.</span>}
       </div>
     </div>
   );

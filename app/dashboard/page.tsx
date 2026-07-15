@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useDashboard } from "@/components/dashboard/DashboardShell";
 import StudyRecommendations from "@/components/dashboard/StudyRecommendations";
+import CurrencyWidget from "@/components/dashboard/CurrencyWidget";
 
 type Overview = {
   stats: {
@@ -48,20 +49,23 @@ export default function DashboardOverviewPage() {
 
   if (loaded && !activeSubjectId) {
     return (
-      <div className="rounded-lg border border-line bg-white p-10 text-center shadow-sm">
-        <h1 className="font-display text-xl font-semibold text-navy-900">
-          Welcome aboard
-        </h1>
-        <p className="mx-auto mt-3 max-w-md text-sm text-ink-soft">
-          Subscribe to a qualification in Settings to unlock its subjects, then come
-          back here to start practising.
-        </p>
-        <Link
-          href="/dashboard/settings"
-          className="mt-5 inline-block rounded bg-gold-500 px-5 py-2.5 text-sm font-semibold text-navy-950 hover:bg-gold-400"
-        >
-          Open settings
-        </Link>
+      <div>
+        <div className="rounded-lg border border-line bg-white p-10 text-center shadow-sm">
+          <h1 className="font-display text-xl font-semibold text-navy-900">
+            Welcome aboard
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-sm text-ink-soft">
+            Subscribe to a qualification in Settings to unlock its subjects, then come
+            back here to start practising.
+          </p>
+          <Link
+            href="/dashboard/settings"
+            className="mt-5 inline-block rounded bg-gold-500 px-5 py-2.5 text-sm font-semibold text-navy-950 hover:bg-gold-400"
+          >
+            Open settings
+          </Link>
+        </div>
+        <CurrencyWidget />
       </div>
     );
   }
@@ -97,6 +101,8 @@ export default function DashboardOverviewPage() {
       </div>
 
       <StudyRecommendations subjectId={activeSubjectId} />
+
+      <CurrencyWidget />
 
       {/* Resume outstanding sessions */}
       {active.length > 0 && (

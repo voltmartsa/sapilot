@@ -8,6 +8,16 @@ export const dynamic = "force-dynamic";
 
 const VALID_STATUS = new Set(["available", "maintenance", "offline"]);
 
+/** Parses an optional date field. Returns `null` for absent/empty (clear the
+ * value) or a Date; throws a string error message if the value is present but
+ * invalid. */
+function parseOptionalDate(value: unknown): Date | null {
+  if (value === undefined || value === null || value === "") return null;
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) throw "Enter a valid date.";
+  return d;
+}
+
 export async function GET() {
   const user = await getSessionUser();
   if (!user || user.role !== "school_admin" || !user.schoolId) {
@@ -32,6 +42,15 @@ export async function POST(req: NextRequest) {
   if (!type) return NextResponse.json({ error: "Enter the aircraft type." }, { status: 400 });
   if (!VALID_STATUS.has(status)) return NextResponse.json({ error: "Invalid status." }, { status: 400 });
 
+  let arcExpiry: Date | null, insuranceExpiry: Date | null, nextInspectionDue: Date | null;
+  try {
+    arcExpiry = parseOptionalDate(body?.arcExpiry);
+    insuranceExpiry = parseOptionalDate(body?.insuranceExpiry);
+    nextInspectionDue = parseOptionalDate(body?.nextInspectionDue);
+  } catch (msg) {
+    return NextResponse.json({ error: String(msg) }, { status: 400 });
+  }
+
   const [existing] = await db
     .select({ id: aircraft.id })
     .from(aircraft)
@@ -42,7 +61,16 @@ export async function POST(req: NextRequest) {
 
   const [created] = await db
     .insert(aircraft)
-    .values({ schoolId: user.schoolId, registration, type, status, note })
+    .values({
+      schoolId: user.schoolId,
+      registration,
+      type,
+      status,
+      note,
+      arcExpiry,
+      insuranceExpiry,
+      nextInspectionDue,
+    })
     .returning();
   return NextResponse.json({ aircraft: created });
 }
@@ -73,6 +101,13 @@ export async function PATCH(req: NextRequest) {
     patch.status = body.status;
   }
   if (body?.note !== undefined) patch.note = String(body.note).trim();
+  try {
+    if (body?.arcExpiry !== undefined) patch.arcExpiry = parseOptionalDate(body.arcExpiry);
+    if (body?.insuranceExpiry !== undefined) patch.insuranceExpiry = parseOptionalDate(body.insuranceExpiry);
+    if (body?.nextInspectionDue !== undefined) patch.nextInspectionDue = parseOptionalDate(body.nextInspectionDue);
+  } catch (msg) {
+    return NextResponse.json({ error: String(msg) }, { status: 400 });
+  }
 
   const updated = await db
     .update(aircraft)

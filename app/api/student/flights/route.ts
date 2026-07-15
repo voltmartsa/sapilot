@@ -25,6 +25,7 @@ export async function GET() {
       cancelNote: flightBookings.cancelNote,
       cancelledAt: flightBookings.cancelledAt,
       hoursLogged: flightBookings.hoursLogged,
+      hoursRole: flightBookings.hoursRole,
     })
     .from(flightBookings)
     .innerJoin(aircraft, eq(aircraft.id, flightBookings.aircraftId))

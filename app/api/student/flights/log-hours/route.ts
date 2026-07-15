@@ -6,6 +6,8 @@ import { getSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+const VALID_ROLE = new Set(["dual", "solo", "pic"]);
+
 export async function POST(req: NextRequest) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
@@ -13,12 +15,16 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const bookingId = Number(body?.bookingId);
   const hours = Number(body?.hours);
+  const role = String(body?.role ?? "dual");
 
   if (!Number.isInteger(bookingId) || bookingId <= 0) {
     return NextResponse.json({ error: "bookingId is required." }, { status: 400 });
   }
   if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
     return NextResponse.json({ error: "Enter a valid number of hours (up to 24)." }, { status: 400 });
+  }
+  if (!VALID_ROLE.has(role)) {
+    return NextResponse.json({ error: "Invalid flight role." }, { status: 400 });
   }
 
   const [booking] = await db
@@ -35,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   await db
     .update(flightBookings)
-    .set({ hoursLogged: hours, hoursLoggedAt: new Date(), updatedAt: new Date() })
+    .set({ hoursLogged: hours, hoursLoggedAt: new Date(), hoursRole: role, updatedAt: new Date() })
     .where(eq(flightBookings.id, bookingId));
   return NextResponse.json({ ok: true });
 }

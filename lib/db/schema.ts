@@ -216,6 +216,11 @@ export const aircraft = pgTable(
     type: text("type").notNull(), // e.g. "Cessna 172"
     status: varchar("status", { length: 12 }).notNull().default("available"), // available | maintenance | offline
     note: text("note").notNull().default(""),
+    // Airworthiness tracking — calendar-date due items. Nullable: a school may
+    // not have entered them yet.
+    arcExpiry: timestamp("arc_expiry"),
+    insuranceExpiry: timestamp("insurance_expiry"),
+    nextInspectionDue: timestamp("next_inspection_due"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("aircraft_school_registration_idx").on(t.schoolId, t.registration)],
@@ -250,6 +255,60 @@ export const flightBookings = pgTable("flight_bookings", {
   cancelledAt: timestamp("cancelled_at"),
   hoursLogged: real("hours_logged"),
   hoursLoggedAt: timestamp("hours_logged_at"),
+  // dual | solo | pic — set alongside hoursLogged when a student logs hours.
+  hoursRole: varchar("hours_role", { length: 8 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Generic, manually-entered currency/recency due-dates (e.g. medical, BFR,
+// licence revalidation). Deliberately not modelling specific SACAA regulatory
+// rules — the student enters what applies to them.
+export const currencyItems = pgTable("currency_items", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  note: text("note").notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Manually entered historical flight hours (e.g. flown before joining, with
+// another school, or self-flown) — not tied to a school aircraft booking.
+export const manualLogbookEntries = pgTable("manual_logbook_entries", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  flightDate: timestamp("flight_date").notNull(),
+  aircraftType: text("aircraft_type").notNull(),
+  registration: varchar("registration", { length: 16 }).notNull().default(""),
+  picName: text("pic_name").notNull().default(""),
+  route: text("route").notNull().default(""), // flight sequence, e.g. FALA-FAGC-FALA
+  dayNight: varchar("day_night", { length: 5 }).notNull().default("day"), // "day" | "night"
+  landings: integer("landings").notNull().default(1),
+  instrumentHours: real("instrument_hours"), // nullable — only if any instrument time was flown
+  hours: real("hours").notNull(),
+  role: varchar("role", { length: 8 }).notNull().default("dual"), // dual | solo | pic
+  notes: text("notes").notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const groundSchoolSessions = pgTable("ground_school_sessions", {
+  id: serial("id").primaryKey(),
+  schoolId: integer("school_id")
+    .notNull()
+    .references(() => schools.id, { onDelete: "cascade" }),
+  instructorId: integer("instructor_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at").notNull(),
+  location: text("location").notNull().default(""),
+  notes: text("notes").notNull().default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -262,3 +321,6 @@ export type User = typeof users.$inferSelect;
 export type School = typeof schools.$inferSelect;
 export type Aircraft = typeof aircraft.$inferSelect;
 export type FlightBooking = typeof flightBookings.$inferSelect;
+export type CurrencyItem = typeof currencyItems.$inferSelect;
+export type GroundSchoolSession = typeof groundSchoolSessions.$inferSelect;
+export type ManualLogbookEntry = typeof manualLogbookEntries.$inferSelect;

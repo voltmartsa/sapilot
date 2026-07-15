@@ -8,7 +8,30 @@ type AircraftRow = {
   type: string;
   status: "available" | "maintenance" | "offline";
   note: string;
+  arcExpiry: string | null;
+  insuranceExpiry: string | null;
+  nextInspectionDue: string | null;
 };
+
+const MAINTENANCE_WINDOW_DAYS = 30;
+
+function dateBadgeStyle(dateStr: string | null): string {
+  if (!dateStr) return "text-ink-soft";
+  const days = Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (days < 0) return "font-semibold text-red-700";
+  if (days <= MAINTENANCE_WINDOW_DAYS) return "font-semibold text-gold-700";
+  return "text-ink-soft";
+}
+
+function fmtDate(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function toInputDate(dateStr: string | null): string {
+  if (!dateStr) return "";
+  return new Date(dateStr).toISOString().slice(0, 10);
+}
 
 const STATUS_STYLE: Record<string, string> = {
   available: "bg-emerald-100 text-emerald-800",
@@ -26,6 +49,9 @@ export default function SchoolAircraftPage() {
   const [registration, setRegistration] = useState("");
   const [type, setType] = useState("");
   const [note, setNote] = useState("");
+  const [arcExpiry, setArcExpiry] = useState("");
+  const [insuranceExpiry, setInsuranceExpiry] = useState("");
+  const [nextInspectionDue, setNextInspectionDue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<AircraftRow | null>(null);
@@ -49,7 +75,15 @@ export default function SchoolAircraftPage() {
       const res = await fetch("/api/school/aircraft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registration, type, status: "available", note }),
+        body: JSON.stringify({
+          registration,
+          type,
+          status: "available",
+          note,
+          arcExpiry: arcExpiry || null,
+          insuranceExpiry: insuranceExpiry || null,
+          nextInspectionDue: nextInspectionDue || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -59,6 +93,9 @@ export default function SchoolAircraftPage() {
       setRegistration("");
       setType("");
       setNote("");
+      setArcExpiry("");
+      setInsuranceExpiry("");
+      setNextInspectionDue("");
       load();
     } catch {
       setError("Could not reach the server.");
@@ -102,6 +139,9 @@ export default function SchoolAircraftPage() {
           registration: editing.registration,
           type: editing.type,
           note: editing.note,
+          arcExpiry: editing.arcExpiry || null,
+          insuranceExpiry: editing.insuranceExpiry || null,
+          nextInspectionDue: editing.nextInspectionDue || null,
         }),
       });
       const data = await res.json();
@@ -182,6 +222,34 @@ export default function SchoolAircraftPage() {
         >
           {busy ? "Adding…" : "Add aircraft"}
         </button>
+
+        <label className="block text-xs font-semibold text-ink">
+          ARC expiry
+          <input
+            type="date"
+            value={arcExpiry}
+            onChange={(e) => setArcExpiry(e.target.value)}
+            className="mt-1 w-full rounded border border-line px-3 py-2 text-sm font-normal"
+          />
+        </label>
+        <label className="block text-xs font-semibold text-ink">
+          Insurance expiry
+          <input
+            type="date"
+            value={insuranceExpiry}
+            onChange={(e) => setInsuranceExpiry(e.target.value)}
+            className="mt-1 w-full rounded border border-line px-3 py-2 text-sm font-normal"
+          />
+        </label>
+        <label className="block text-xs font-semibold text-ink">
+          Next inspection due
+          <input
+            type="date"
+            value={nextInspectionDue}
+            onChange={(e) => setNextInspectionDue(e.target.value)}
+            className="mt-1 w-full rounded border border-line px-3 py-2 text-sm font-normal"
+          />
+        </label>
       </form>
 
       {error && (
@@ -202,6 +270,11 @@ export default function SchoolAircraftPage() {
                     {r.registration} <span className="font-normal text-ink-soft">— {r.type}</span>
                   </p>
                   {r.note && <p className="text-xs text-ink-soft">{r.note}</p>}
+                  <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+                    <span className={dateBadgeStyle(r.arcExpiry)}>ARC: {fmtDate(r.arcExpiry)}</span>
+                    <span className={dateBadgeStyle(r.insuranceExpiry)}>Insurance: {fmtDate(r.insuranceExpiry)}</span>
+                    <span className={dateBadgeStyle(r.nextInspectionDue)}>Inspection: {fmtDate(r.nextInspectionDue)}</span>
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <select
@@ -265,6 +338,33 @@ export default function SchoolAircraftPage() {
                   rows={2}
                   value={editing.note}
                   onChange={(e) => setEditing({ ...editing, note: e.target.value })}
+                  className="mt-1 w-full rounded border border-line px-3 py-2 text-sm font-normal"
+                />
+              </label>
+              <label className="block text-xs font-semibold text-ink">
+                ARC expiry
+                <input
+                  type="date"
+                  value={toInputDate(editing.arcExpiry)}
+                  onChange={(e) => setEditing({ ...editing, arcExpiry: e.target.value || null })}
+                  className="mt-1 w-full rounded border border-line px-3 py-2 text-sm font-normal"
+                />
+              </label>
+              <label className="block text-xs font-semibold text-ink">
+                Insurance expiry
+                <input
+                  type="date"
+                  value={toInputDate(editing.insuranceExpiry)}
+                  onChange={(e) => setEditing({ ...editing, insuranceExpiry: e.target.value || null })}
+                  className="mt-1 w-full rounded border border-line px-3 py-2 text-sm font-normal"
+                />
+              </label>
+              <label className="block text-xs font-semibold text-ink">
+                Next inspection due
+                <input
+                  type="date"
+                  value={toInputDate(editing.nextInspectionDue)}
+                  onChange={(e) => setEditing({ ...editing, nextInspectionDue: e.target.value || null })}
                   className="mt-1 w-full rounded border border-line px-3 py-2 text-sm font-normal"
                 />
               </label>

@@ -59,6 +59,11 @@ const NAV: NavItem[] = [
     schoolOnly: true,
   },
   {
+    href: "/dashboard/logbook",
+    label: "Logbook",
+    icon: "M2.5 4.5C4 3.5 6.3 3 10 3s6 .5 7.5 1.5v10c-1.5-1-3.8-1.5-7.5-1.5s-6 .5-7.5 1.5v-10zM10 3v10",
+  },
+  {
     href: "/dashboard/tools",
     label: "Tools",
     icon: "M12.5 3.5a3 3 0 00-4 4L3 13v3h3l5.5-5.5a3 3 0 004-4L13 9l-2-2z",
