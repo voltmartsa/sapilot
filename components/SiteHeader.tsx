@@ -1,12 +1,16 @@
-import Link from "next/link";
-import AccountMenu from "./AccountMenu";
+"use client";
 
-const nav = [
-  { href: "/qualifications/ppl", label: "PPL" },
-  { href: "/qualifications/cpl", label: "CPL" },
-  { href: "/qualifications/instrument-rating", label: "Instrument Rating" },
-  { href: "/qualifications/atpl", label: "ATPL" },
-];
+import { useEffect, useState } from "react";
+import Link from "next/link";
+
+type Me = { id: number; email: string; name: string; role: string } | null;
+
+function homeFor(role: string): string {
+  if (role === "super_admin") return "/admin";
+  if (role === "instructor") return "/instructor";
+  if (role === "school_admin") return "/school";
+  return "/dashboard";
+}
 
 export function Roundel({ className = "h-8 w-8" }: { className?: string }) {
   return (
@@ -23,62 +27,68 @@ export function Roundel({ className = "h-8 w-8" }: { className?: string }) {
 }
 
 export default function SiteHeader() {
+  const [me, setMe] = useState<Me>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) {
+          setMe(d.user ?? null);
+          setLoaded(true);
+        }
+      })
+      .catch(() => setLoaded(true));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 border-b border-navy-800 bg-navy-900 text-white shadow-sm">
       <div className="h-0.5 bg-gold-500" />
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-2.5">
           <span className="text-gold-400">
             <Roundel />
           </span>
-          <span className="leading-tight">
-            <span className="font-display block text-lg font-semibold tracking-wide">
-              SA Pilot Question Bank
-            </span>
-            <span className="block text-[11px] uppercase tracking-[0.18em] text-navy-100/70">
-              Aviation Examination Preparation
-            </span>
+          <span className="font-display text-lg font-semibold tracking-wide">
+            SA PILOT
           </span>
         </Link>
-        <nav className="hidden items-center gap-1 md:flex">
-          {nav.map((item) => (
+
+        {!loaded ? (
+          <span className="h-8 w-24" aria-hidden="true" />
+        ) : me ? (
+          <Link
+            href={homeFor(me.role)}
+            className="flex items-center gap-2 rounded px-3 py-2 text-sm font-medium text-navy-100/90 transition-colors hover:bg-navy-800 hover:text-white"
+            title={me.email}
+          >
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gold-500 text-xs font-bold text-navy-950">
+              {me.name.trim().charAt(0).toUpperCase()}
+            </span>
+            Profile
+          </Link>
+        ) : (
+          <nav className="flex items-center gap-1">
             <Link
-              key={item.href}
-              href={item.href}
+              href="/#qualifications"
               className="rounded px-3 py-2 text-sm font-medium text-navy-100/90 transition-colors hover:bg-navy-800 hover:text-white"
             >
-              {item.label}
+              Subscriptions
             </Link>
-          ))}
-          <Link
-            href="/admin"
-            className="mx-2 rounded border border-gold-500/60 px-3 py-1.5 text-sm font-medium text-gold-400 transition-colors hover:bg-gold-500 hover:text-navy-950"
-          >
-            Admin
-          </Link>
-          <AccountMenu />
-        </nav>
-        <span className="md:hidden">
-          <AccountMenu />
-        </span>
+            <Link
+              href="/login"
+              className="rounded bg-gold-500 px-3 py-1.5 text-sm font-semibold text-navy-950 transition-colors hover:bg-gold-400"
+            >
+              Sign In / Sign Up
+            </Link>
+          </nav>
+        )}
       </div>
-      <nav className="flex items-center gap-1 overflow-x-auto border-t border-navy-800 px-4 py-1.5 md:hidden">
-        {nav.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="whitespace-nowrap rounded px-3 py-1.5 text-sm text-navy-100/90 hover:bg-navy-800"
-          >
-            {item.label}
-          </Link>
-        ))}
-        <Link
-          href="/admin"
-          className="whitespace-nowrap rounded px-3 py-1.5 text-sm text-gold-400 hover:bg-navy-800"
-        >
-          Admin
-        </Link>
-      </nav>
     </header>
   );
 }

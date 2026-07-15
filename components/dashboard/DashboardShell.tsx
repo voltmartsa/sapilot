@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export type SubjectGroup = {
   qualificationId: number;
@@ -84,6 +84,7 @@ const STORAGE_KEY = "sapilot-active-subject";
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [groups, setGroups] = useState<SubjectGroup[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [activeSubjectId, setActiveSubjectIdState] = useState<number | null>(null);
@@ -103,6 +104,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, []);
 
   const navItems = useMemo(() => NAV.filter((item) => !item.schoolOnly || hasSchool), [hasSchool]);
+
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/");
+    router.refresh();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -180,6 +187,13 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               );
             })}
           </nav>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="mt-6 px-3 text-xs font-semibold text-ink-soft hover:text-red-600"
+          >
+            Sign out
+          </button>
         </aside>
 
         <div className="min-w-0 flex-1 py-8 md:pl-8">
@@ -251,6 +265,13 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 </Link>
               );
             })}
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="whitespace-nowrap rounded px-3 py-2 text-sm font-medium text-ink-soft hover:bg-navy-50 hover:text-red-600"
+            >
+              Sign out
+            </button>
           </nav>
 
           <div className="px-4 sm:px-0">{children}</div>

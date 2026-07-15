@@ -101,6 +101,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 </Link>
               );
             })}
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="whitespace-nowrap rounded px-3 py-2 text-sm font-medium text-ink-soft hover:bg-navy-50 hover:text-red-600"
+            >
+              Sign out
+            </button>
           </nav>
           <div className="px-4 sm:px-0">{children}</div>
         </div>
