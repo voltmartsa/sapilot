@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useDashboard } from "@/components/dashboard/DashboardShell";
+import StudyRecommendations from "@/components/dashboard/StudyRecommendations";
 
 type Overview = {
   stats: {
@@ -94,6 +95,8 @@ export default function DashboardOverviewPage() {
           </div>
         ))}
       </div>
+
+      <StudyRecommendations subjectId={activeSubjectId} />
 
       {/* Resume outstanding sessions */}
       {active.length > 0 && (

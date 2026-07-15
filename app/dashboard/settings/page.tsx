@@ -6,6 +6,9 @@ import { getSessionUser, getSubscribedQualificationIds } from "@/lib/auth";
 import { getQualifications } from "@/lib/data";
 import ProfileForm from "@/components/ProfileForm";
 import SubscribeButton from "@/components/SubscribeButton";
+import LeaderboardToggle from "@/components/LeaderboardToggle";
+import ChangePasswordForm from "@/components/ChangePasswordForm";
+import SchoolAffiliationCard from "@/components/SchoolAffiliationCard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +24,7 @@ export default async function DashboardSettingsPage() {
         name: users.name,
         email: users.email,
         baseAirport: users.baseAirport,
+        leaderboardOptIn: users.leaderboardOptIn,
       })
       .from(users)
       .where(eq(users.id, sessionUser.id)),
@@ -84,6 +88,14 @@ export default async function DashboardSettingsPage() {
               );
             })}
           </ul>
+        </div>
+
+        <ChangePasswordForm />
+
+        <SchoolAffiliationCard />
+
+        <div className="lg:col-span-2">
+          <LeaderboardToggle initialOptIn={profile.leaderboardOptIn} />
         </div>
       </div>
     </div>

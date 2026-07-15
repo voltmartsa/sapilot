@@ -3,16 +3,17 @@ import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   qualifications,
+  schools,
   studySessions,
   subscriptions,
   users,
 } from "@/lib/db/schema";
-import { checkAdminPasscode } from "@/lib/admin";
+import { checkAdminAuth } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  if (!checkAdminPasscode(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
 
@@ -22,9 +23,12 @@ export async function GET(req: NextRequest) {
       name: users.name,
       email: users.email,
       baseAirport: users.baseAirport,
+      role: users.role,
+      schoolName: schools.name,
       createdAt: users.createdAt,
     })
     .from(users)
+    .leftJoin(schools, eq(schools.id, users.schoolId))
     .orderBy(desc(users.createdAt));
 
   const subs = await db
@@ -62,13 +66,20 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!checkAdminPasscode(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
   const body = await req.json().catch(() => null);
   const userId = Number(body?.userId);
   if (!Number.isInteger(userId) || userId <= 0) {
     return NextResponse.json({ error: "userId is required." }, { status: 400 });
+  }
+  const [target] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId));
+  if (target?.role === "super_admin") {
+    return NextResponse.json(
+      { error: "Super admin accounts can't be deleted from here." },
+      { status: 403 },
+    );
   }
   const deleted = await db
     .delete(users)

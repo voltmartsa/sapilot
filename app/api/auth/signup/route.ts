@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { schools, users } from "@/lib/db/schema";
 import { createSession, hashPassword, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Optional school affiliation. Self-signup is always role="student" — school
+  // and instructor accounts are provisioned by the super admin / a school admin.
+  const schoolIdRaw = body?.schoolId;
+  let schoolId: number | null = null;
+  let shareWithSchool = false;
+  if (schoolIdRaw !== undefined && schoolIdRaw !== null && schoolIdRaw !== "") {
+    const parsed = Number(schoolIdRaw);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return NextResponse.json({ error: "Select a valid school." }, { status: 400 });
+    }
+    const [school] = await db.select({ id: schools.id }).from(schools).where(eq(schools.id, parsed));
+    if (!school) {
+      return NextResponse.json({ error: "That school could not be found." }, { status: 400 });
+    }
+    schoolId = school.id;
+    shareWithSchool = !!body?.shareWithSchool;
+  }
+
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
   if (existing) {
     return NextResponse.json(
@@ -42,8 +60,15 @@ export async function POST(req: NextRequest) {
 
   const [user] = await db
     .insert(users)
-    .values({ name, email, baseAirport, passwordHash: hashPassword(password) })
-    .returning({ id: users.id, email: users.email, name: users.name });
+    .values({
+      name,
+      email,
+      baseAirport,
+      passwordHash: hashPassword(password),
+      schoolId,
+      shareWithSchool,
+    })
+    .returning({ id: users.id, email: users.email, name: users.name, role: users.role });
 
   const { token, expiresAt } = await createSession(user.id);
   const res = NextResponse.json({ user });

@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-type Me = { id: number; email: string; name: string } | null;
+type Me = { id: number; email: string; name: string; role: string } | null;
+
+function homeFor(role: string): string {
+  if (role === "super_admin") return "/admin";
+  if (role === "instructor") return "/instructor";
+  if (role === "school_admin") return "/school";
+  return "/dashboard";
+}
 
 export default function AccountMenu() {
   const router = useRouter();
@@ -60,14 +67,20 @@ export default function AccountMenu() {
   return (
     <span className="flex items-center gap-1">
       <Link
-        href="/dashboard"
+        href={homeFor(me.role)}
         className="flex items-center gap-2 rounded px-3 py-2 text-sm font-medium text-navy-100/90 transition-colors hover:bg-navy-800 hover:text-white"
         title={me.email}
       >
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gold-500 text-xs font-bold text-navy-950">
           {me.name.trim().charAt(0).toUpperCase()}
         </span>
-        Dashboard
+        {me.role === "super_admin"
+          ? "Admin Portal"
+          : me.role === "instructor"
+            ? "My Students"
+            : me.role === "school_admin"
+              ? "School Portal"
+              : "Dashboard"}
       </Link>
       <button
         type="button"

@@ -2,22 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chapters, images, questions, subjects } from "@/lib/db/schema";
+import { isSuperAdmin, passcodeIsValid } from "@/lib/admin";
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/images";
 
 export const dynamic = "force-dynamic";
-
-const ALLOWED_IMAGE_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-]);
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   const form = await req.formData();
 
   const passcode = String(form.get("passcode") ?? "");
-  if (!process.env.ADMIN_PASSCODE || passcode !== process.env.ADMIN_PASSCODE) {
+  if (!passcodeIsValid(passcode) && !(await isSuperAdmin())) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
 

@@ -54,7 +54,7 @@ export default function SiteHeader() {
             href="/admin"
             className="mx-2 rounded border border-gold-500/60 px-3 py-1.5 text-sm font-medium text-gold-400 transition-colors hover:bg-gold-500 hover:text-navy-950"
           >
-            Instructor
+            Admin
           </Link>
           <AccountMenu />
         </nav>
@@ -76,7 +76,7 @@ export default function SiteHeader() {
           href="/admin"
           className="whitespace-nowrap rounded px-3 py-1.5 text-sm text-gold-400 hover:bg-navy-800"
         >
-          Instructor
+          Admin
         </Link>
       </nav>
     </header>

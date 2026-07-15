@@ -42,18 +42,42 @@ export async function destroySession(token: string) {
   await db.delete(sessions).where(eq(sessions.token, token));
 }
 
-export type SessionUser = { id: number; email: string; name: string };
+export type Role = "student" | "instructor" | "school_admin" | "super_admin";
+
+export type SessionUser = {
+  id: number;
+  email: string;
+  name: string;
+  role: Role;
+  schoolId: number | null;
+  instructorId: number | null;
+};
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const [row] = await db
-    .select({ id: users.id, email: users.email, name: users.name })
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      role: users.role,
+      schoolId: users.schoolId,
+      instructorId: users.instructorId,
+    })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(and(eq(sessions.token, token), gt(sessions.expiresAt, new Date())));
-  return row ?? null;
+  return row ? { ...row, role: row.role as Role } : null;
+}
+
+/** Where a signed-in user should land by default, based on their role. */
+export function roleHomePath(role: Role): string {
+  if (role === "super_admin") return "/admin";
+  if (role === "instructor") return "/instructor";
+  if (role === "school_admin") return "/school";
+  return "/dashboard";
 }
 
 export async function isSubscribed(

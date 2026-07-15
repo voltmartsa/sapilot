@@ -9,12 +9,12 @@ import {
   subjects,
   users,
 } from "@/lib/db/schema";
-import { checkAdminPasscode } from "@/lib/admin";
+import { checkAdminAuth } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  if (!checkAdminPasscode(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
 

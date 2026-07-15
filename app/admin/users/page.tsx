@@ -8,11 +8,26 @@ type UserRow = {
   name: string;
   email: string;
   baseAirport: string | null;
+  role: string;
+  schoolName: string | null;
   createdAt: string;
   subscriptions: string[];
   sessions: number;
   answered: number;
   accuracy: number | null;
+};
+
+const ROLE_STYLE: Record<string, string> = {
+  student: "bg-navy-100 text-navy-800",
+  instructor: "bg-blue-100 text-blue-800",
+  school_admin: "bg-gold-500/20 text-gold-700",
+  super_admin: "bg-navy-900 text-gold-400",
+};
+const ROLE_LABEL: Record<string, string> = {
+  student: "Student",
+  instructor: "Instructor",
+  school_admin: "School Admin",
+  super_admin: "Super Admin",
 };
 
 export default function AdminUsersPage() {
@@ -65,7 +80,8 @@ export default function AdminUsersPage() {
     <div>
       <h1 className="font-display text-2xl font-semibold text-navy-900">Users</h1>
       <p className="mt-1 text-sm text-ink-soft">
-        Every registered student, with their subscriptions and activity.
+        Every registered account across all roles, with school affiliation, subscriptions
+        and activity.
       </p>
       {error && (
         <p className="mt-4 rounded border-l-4 border-red-500 bg-red-50 p-3 text-sm text-red-800">
@@ -84,7 +100,9 @@ export default function AdminUsersPage() {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-xs uppercase tracking-wider text-ink-soft">
-                <th className="px-4 py-3 font-semibold">Student</th>
+                <th className="px-4 py-3 font-semibold">User</th>
+                <th className="px-4 py-3 font-semibold">Role</th>
+                <th className="px-4 py-3 font-semibold">School</th>
                 <th className="px-4 py-3 font-semibold">Base</th>
                 <th className="px-4 py-3 font-semibold">Subscriptions</th>
                 <th className="px-4 py-3 font-semibold">Sessions</th>
@@ -100,6 +118,12 @@ export default function AdminUsersPage() {
                     <p className="font-medium text-ink">{u.name}</p>
                     <p className="text-xs text-ink-soft">{u.email}</p>
                   </td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${ROLE_STYLE[u.role] ?? ROLE_STYLE.student}`}>
+                      {ROLE_LABEL[u.role] ?? u.role}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-ink-soft">{u.schoolName ?? "—"}</td>
                   <td className="px-4 py-3 font-mono text-xs">{u.baseAirport ?? "—"}</td>
                   <td className="px-4 py-3">
                     {u.subscriptions.length === 0 ? (

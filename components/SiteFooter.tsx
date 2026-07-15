@@ -41,7 +41,7 @@ export default function SiteFooter() {
             </li>
             <li>
               <Link className="hover:text-white" href="/admin">
-                Instructor portal
+                Admin portal
               </Link>
             </li>
           </ul>

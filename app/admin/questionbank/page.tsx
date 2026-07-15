@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAdmin } from "@/components/admin/AdminShell";
+import QuestionImage from "@/components/QuestionImage";
 
 type QuestionRow = {
   id: number;
@@ -33,9 +34,40 @@ export default function AdminQuestionBankPage() {
   const [pageSize, setPageSize] = useState(20);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [editing, setEditing] = useState<QuestionRow | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  function openEdit(q: QuestionRow) {
+    setEditing({ ...q });
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setRemovePhoto(false);
+  }
+
+  function closeEdit() {
+    setEditing(null);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setRemovePhoto(false);
+  }
+
+  function choosePhoto(file: File | undefined) {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    if (!file) {
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+    setRemovePhoto(false);
+  }
 
   useEffect(() => {
     fetch("/api/admin/subjects", { headers })
@@ -116,10 +148,22 @@ export default function AdminQuestionBankPage() {
     setBusy(true);
     setError(null);
     try {
+      const form = new FormData();
+      form.set("id", String(editing.id));
+      form.set("text", editing.text);
+      form.set("optionA", editing.optionA);
+      form.set("optionB", editing.optionB);
+      form.set("optionC", editing.optionC ?? "");
+      form.set("optionD", editing.optionD ?? "");
+      form.set("correct", editing.correct);
+      form.set("explanation", editing.explanation);
+      if (photoFile) form.set("photo", photoFile);
+      else if (removePhoto) form.set("removePhoto", "true");
+
       const res = await fetch("/api/admin/questionbank", {
         method: "PATCH",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify(editing),
+        headers,
+        body: form,
       });
       const data = await res.json();
       if (!res.ok) {
@@ -127,7 +171,7 @@ export default function AdminQuestionBankPage() {
         return;
       }
       setNote(`Question #${editing.id} updated.`);
-      setEditing(null);
+      closeEdit();
       load(page);
     } catch {
       setError("Could not reach the server.");
@@ -269,7 +313,7 @@ export default function AdminQuestionBankPage() {
                 <div className="flex shrink-0 gap-2">
                   <button
                     type="button"
-                    onClick={() => setEditing({ ...q })}
+                    onClick={() => openEdit(q)}
                     className="rounded border border-navy-800 px-3 py-1 text-xs font-semibold text-navy-800 hover:bg-navy-50"
                   >
                     Edit
@@ -368,12 +412,69 @@ export default function AdminQuestionBankPage() {
                   className="mt-1 w-full rounded border border-line px-3 py-2 text-sm font-normal"
                 />
               </label>
+
+              <div>
+                <span className="block text-xs font-semibold text-ink">Photo</span>
+                <div className="mt-1.5">
+                  {photoPreview ? (
+                    <div>
+                      <p className="mb-1.5 text-xs text-ink-soft">New photo (not yet saved):</p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photoPreview}
+                        alt="New photo preview"
+                        className="max-h-48 w-auto rounded border border-line"
+                      />
+                    </div>
+                  ) : editing.imageId && !removePhoto ? (
+                    <QuestionImage imageId={editing.imageId} />
+                  ) : editing.imageId && removePhoto ? (
+                    <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      This photo will be removed when you save.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-ink-soft">No photo attached.</p>
+                  )}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    onChange={(e) => choosePhoto(e.target.files?.[0])}
+                    className="text-xs text-ink-soft file:mr-3 file:rounded file:border-0 file:bg-navy-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-navy-800"
+                  />
+                  {(editing.imageId || photoFile) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        choosePhoto(undefined);
+                        if (photoInputRef.current) photoInputRef.current.value = "";
+                        setRemovePhoto(!!editing.imageId);
+                      }}
+                      className="text-xs font-semibold text-red-600 hover:text-red-700"
+                    >
+                      Remove photo
+                    </button>
+                  )}
+                  {removePhoto && (
+                    <button
+                      type="button"
+                      onClick={() => setRemovePhoto(false)}
+                      className="text-xs font-semibold text-navy-800 hover:text-gold-600"
+                    >
+                      Undo
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-ink-soft">PNG, JPEG, GIF or WebP, up to 4 MB.</p>
+              </div>
             </div>
             {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setEditing(null)}
+                onClick={closeEdit}
                 className="rounded border border-navy-800 px-5 py-2 text-sm font-semibold text-navy-800 hover:bg-navy-50"
               >
                 Cancel

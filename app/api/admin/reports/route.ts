@@ -2,16 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chapters, images, questions, reports, subjects, users } from "@/lib/db/schema";
+import { checkAdminAuth } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
-function checkPasscode(req: NextRequest): boolean {
-  const passcode = req.headers.get("x-admin-passcode") ?? "";
-  return !!process.env.ADMIN_PASSCODE && passcode === process.env.ADMIN_PASSCODE;
-}
-
 export async function GET(req: NextRequest) {
-  if (!checkPasscode(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
   const rows = await db
@@ -45,7 +41,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!checkPasscode(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
   const body = await req.json().catch(() => null);

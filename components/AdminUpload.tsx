@@ -36,7 +36,6 @@ export default function AdminUpload({ tree }: { tree: AdminQualification[] }) {
   const photoRef = useRef<HTMLInputElement>(null);
 
   const [mode, setMode] = useState<"excel" | "manual">("excel");
-  const [passcode, setPasscode] = useState("");
   const [qualId, setQualId] = useState<string>(String(tree[0]?.id ?? ""));
   const [subjectId, setSubjectId] = useState<string>("");
   const [chapterMode, setChapterMode] = useState<"existing" | "new">("new");
@@ -49,11 +48,6 @@ export default function AdminUpload({ tree }: { tree: AdminQualification[] }) {
   const [manual, setManual] = useState(EMPTY_MANUAL);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [manualSuccess, setManualSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem("sapilot-admin-passcode");
-    if (saved) setPasscode(saved);
-  }, []);
 
   const qualification = useMemo(
     () => tree.find((q) => String(q.id) === qualId),
@@ -104,7 +98,6 @@ export default function AdminUpload({ tree }: { tree: AdminQualification[] }) {
     }
 
     const form = new FormData();
-    form.set("passcode", passcode);
     form.set("subjectId", subjectId);
     if (chapterMode === "existing") form.set("chapterId", chapterId);
     else form.set("newChapterName", newChapterName.trim());
@@ -118,7 +111,6 @@ export default function AdminUpload({ tree }: { tree: AdminQualification[] }) {
         setError(data.error ?? "Upload failed.");
         return;
       }
-      window.localStorage.setItem("sapilot-admin-passcode", passcode);
       setResult(data as UploadResult);
       setNewChapterName("");
       if (fileRef.current) fileRef.current.value = "";
@@ -160,7 +152,6 @@ export default function AdminUpload({ tree }: { tree: AdminQualification[] }) {
     }
 
     const form = new FormData();
-    form.set("passcode", passcode);
     form.set("subjectId", subjectId);
     if (chapterMode === "existing") form.set("chapterId", chapterId);
     else form.set("newChapterName", newChapterName.trim());
@@ -182,7 +173,6 @@ export default function AdminUpload({ tree }: { tree: AdminQualification[] }) {
         setError(data.error ?? "The question could not be created.");
         return;
       }
-      window.localStorage.setItem("sapilot-admin-passcode", passcode);
       setManualSuccess(
         `Question added to “${data.chapter.name}” in ${data.subject.name}${
           data.question.imageId ? " with its photo" : ""
@@ -200,10 +190,6 @@ export default function AdminUpload({ tree }: { tree: AdminQualification[] }) {
   }
 
   async function deleteChapter(id: number, name: string) {
-    if (!passcode) {
-      setError("Enter the instructor passcode before deleting a chapter.");
-      return;
-    }
     if (
       !window.confirm(
         `Delete "${name}" and every question in it? This cannot be undone.`,
@@ -216,7 +202,7 @@ export default function AdminUpload({ tree }: { tree: AdminQualification[] }) {
       const res = await fetch("/api/admin/chapter", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passcode, chapterId: id }),
+        body: JSON.stringify({ chapterId: id }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -265,21 +251,6 @@ export default function AdminUpload({ tree }: { tree: AdminQualification[] }) {
           </div>
         </div>
         <div className="space-y-6 px-6 py-6">
-          <div>
-            <label htmlFor="passcode" className="block text-sm font-semibold text-ink">
-              Instructor passcode
-            </label>
-            <input
-              id="passcode"
-              type="password"
-              required
-              value={passcode}
-              onChange={(e) => setPasscode(e.target.value)}
-              className="mt-1.5 w-full max-w-sm rounded border border-line bg-white px-3 py-2 text-sm focus:border-navy-700 focus:outline-none"
-              placeholder="Enter the admin passcode"
-            />
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="qual" className="block text-sm font-semibold text-ink">

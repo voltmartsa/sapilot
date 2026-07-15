@@ -1,7 +1,10 @@
 import {
+  type AnyPgColumn,
+  boolean,
   integer,
   jsonb,
   pgTable,
+  real,
   serial,
   text,
   timestamp,
@@ -74,12 +77,33 @@ export const questions = pgTable("questions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const schools = pgTable("schools", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 254 }).notNull().unique(),
+  username: varchar("username", { length: 32 }).unique(), // super_admin login handle
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
   baseAirport: varchar("base_airport", { length: 4 }), // SA ICAO code, e.g. FALA
+  leaderboardOptIn: boolean("leaderboard_opt_in").notNull().default(false),
+  // Role hierarchy: super_admin (site owner) > school_admin > instructor > student.
+  role: varchar("role", { length: 20 }).notNull().default("student"), // student | instructor | school_admin | super_admin
+  // For instructors/school_admins: their employer school. For students: the school
+  // they affiliated with at signup (null = independent student).
+  schoolId: integer("school_id").references(() => schools.id, { onDelete: "set null" }),
+  // Students only: the instructor they've been assigned to by their school.
+  instructorId: integer("instructor_id").references((): AnyPgColumn => users.id, {
+    onDelete: "set null",
+  }),
+  // Students only: consent to share study progress/performance data with their
+  // school and assigned instructor. Roster visibility (name/email) is inherent to
+  // choosing a school; this flag gates report/performance data specifically.
+  shareWithSchool: boolean("share_with_school").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -145,6 +169,29 @@ export const savedQuestions = pgTable(
   (t) => [uniqueIndex("saved_questions_user_question_idx").on(t.userId, t.questionId)],
 );
 
+export const files = pgTable("files", {
+  id: serial("id").primaryKey(),
+  filename: text("filename").notNull(),
+  mime: varchar("mime", { length: 100 }).notNull(),
+  data: text("data").notNull(), // base64-encoded file bytes
+  size: integer("size").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const resources = pgTable("resources", {
+  id: serial("id").primaryKey(),
+  subjectId: integer("subject_id")
+    .notNull()
+    .references(() => subjects.id, { onDelete: "cascade" }),
+  kind: varchar("kind", { length: 10 }).notNull(), // "document" | "link"
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  url: text("url"), // for kind = "link"
+  fileId: integer("file_id").references(() => files.id, { onDelete: "cascade" }), // for kind = "document"
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const reports = pgTable("reports", {
   id: serial("id").primaryKey(),
   userId: integer("user_id")
@@ -158,8 +205,60 @@ export const reports = pgTable("reports", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const aircraft = pgTable(
+  "aircraft",
+  {
+    id: serial("id").primaryKey(),
+    schoolId: integer("school_id")
+      .notNull()
+      .references(() => schools.id, { onDelete: "cascade" }),
+    registration: varchar("registration", { length: 16 }).notNull(),
+    type: text("type").notNull(), // e.g. "Cessna 172"
+    status: varchar("status", { length: 12 }).notNull().default("available"), // available | maintenance | offline
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("aircraft_school_registration_idx").on(t.schoolId, t.registration)],
+);
+
+export const flightBookings = pgTable("flight_bookings", {
+  id: serial("id").primaryKey(),
+  schoolId: integer("school_id")
+    .notNull()
+    .references(() => schools.id, { onDelete: "cascade" }),
+  aircraftId: integer("aircraft_id")
+    .notNull()
+    .references(() => aircraft.id, { onDelete: "cascade" }),
+  instructorId: integer("instructor_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  studentId: integer("student_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at").notNull(),
+  purpose: text("purpose").notNull().default(""),
+  // pending | confirmed | declined | withdrawn | cancelled
+  status: varchar("status", { length: 12 }).notNull().default("pending"),
+  declineReason: text("decline_reason"),
+  // weather | maintenance | student_cancellation | aircraft_unavailable
+  cancelReasonCategory: varchar("cancel_reason_category", { length: 24 }),
+  cancelNote: text("cancel_note"),
+  cancelledBy: integer("cancelled_by").references((): AnyPgColumn => users.id, {
+    onDelete: "set null",
+  }),
+  cancelledAt: timestamp("cancelled_at"),
+  hoursLogged: real("hours_logged"),
+  hoursLoggedAt: timestamp("hours_logged_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export type Qualification = typeof qualifications.$inferSelect;
 export type Subject = typeof subjects.$inferSelect;
 export type Chapter = typeof chapters.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type User = typeof users.$inferSelect;
+export type School = typeof schools.$inferSelect;
+export type Aircraft = typeof aircraft.$inferSelect;
+export type FlightBooking = typeof flightBookings.$inferSelect;

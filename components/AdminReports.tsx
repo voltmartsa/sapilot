@@ -29,35 +29,27 @@ const statusStyle: Record<string, string> = {
 };
 
 export default function AdminReports() {
-  const [passcode, setPasscode] = useState("");
   const [rows, setRows] = useState<ReportRow[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onlyOpen, setOnlyOpen] = useState(true);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("sapilot-admin-passcode");
-    if (saved) {
-      setPasscode(saved);
-      void load(saved);
-    }
+    void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function load(currentPasscode = passcode) {
+  async function load() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/reports", {
-        headers: { "x-admin-passcode": currentPasscode },
-      });
+      const res = await fetch("/api/admin/reports");
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "The reports could not be loaded.");
         setRows(null);
         return;
       }
-      window.localStorage.setItem("sapilot-admin-passcode", currentPasscode);
       setRows(data.reports as ReportRow[]);
     } catch {
       setError("Could not reach the server.");
@@ -80,10 +72,7 @@ export default function AdminReports() {
     try {
       const res = await fetch("/api/admin/reports", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-passcode": passcode,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reportId, action }),
       });
       const data = await res.json();
@@ -116,23 +105,14 @@ export default function AdminReports() {
         </div>
         <div className="flex items-center gap-2">
           {rows === null ? (
-            <>
-              <input
-                type="password"
-                value={passcode}
-                onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Instructor passcode"
-                className="rounded border border-line bg-white px-3 py-2 text-sm focus:border-navy-700 focus:outline-none"
-              />
-              <button
-                type="button"
-                disabled={busy || !passcode}
-                onClick={() => void load()}
-                className="rounded bg-navy-900 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-800 disabled:opacity-50"
-              >
-                {busy ? "Loading…" : "Load reports"}
-              </button>
-            </>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void load()}
+              className="rounded border border-navy-800 px-3 py-1.5 text-sm font-semibold text-navy-800 hover:bg-navy-50 disabled:opacity-50"
+            >
+              {busy ? "Loading…" : "Retry"}
+            </button>
           ) : (
             <>
               <label className="flex items-center gap-2 text-sm text-ink">

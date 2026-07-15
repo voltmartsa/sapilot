@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, ilike, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chapters, images, questions, subjects } from "@/lib/db/schema";
-import { checkAdminPasscode } from "@/lib/admin";
+import { checkAdminAuth } from "@/lib/admin";
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/images";
 
 export const dynamic = "force-dynamic";
 
 /** Filterable, paginated question list. */
 export async function GET(req: NextRequest) {
-  if (!checkAdminPasscode(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
   const p = req.nextUrl.searchParams;
@@ -70,24 +71,24 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** Edit a question in place. */
+/** Edit a question in place — text, options, and optionally its photo. */
 export async function PATCH(req: NextRequest) {
-  if (!checkAdminPasscode(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
-  const body = await req.json().catch(() => null);
-  const id = Number(body?.id);
+  const form = await req.formData();
+  const id = Number(form.get("id"));
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: "Question id is required." }, { status: 400 });
   }
 
-  const text = String(body?.text ?? "").trim();
-  const optionA = String(body?.optionA ?? "").trim();
-  const optionB = String(body?.optionB ?? "").trim();
-  const optionC = String(body?.optionC ?? "").trim();
-  const optionD = String(body?.optionD ?? "").trim();
-  const correct = String(body?.correct ?? "").trim().toUpperCase();
-  const explanation = String(body?.explanation ?? "").trim();
+  const text = String(form.get("text") ?? "").trim();
+  const optionA = String(form.get("optionA") ?? "").trim();
+  const optionB = String(form.get("optionB") ?? "").trim();
+  const optionC = String(form.get("optionC") ?? "").trim();
+  const optionD = String(form.get("optionD") ?? "").trim();
+  const correct = String(form.get("correct") ?? "").trim().toUpperCase();
+  const explanation = String(form.get("explanation") ?? "").trim();
 
   if (!text || !optionA || !optionB) {
     return NextResponse.json(
@@ -105,7 +106,42 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const updated = await db
+  const [existing] = await db
+    .select({ imageId: questions.imageId })
+    .from(questions)
+    .where(eq(questions.id, id));
+  if (!existing) {
+    return NextResponse.json({ error: "Question not found." }, { status: 404 });
+  }
+
+  let imageId = existing.imageId;
+  let staleImageId: number | null = null;
+  const removePhoto = form.get("removePhoto") === "true";
+  const photo = form.get("photo");
+
+  if (photo instanceof Blob && photo.size > 0) {
+    if (!ALLOWED_IMAGE_TYPES.has(photo.type)) {
+      return NextResponse.json(
+        { error: "The photo must be a PNG, JPEG, GIF or WebP image." },
+        { status: 400 },
+      );
+    }
+    if (photo.size > MAX_IMAGE_BYTES) {
+      return NextResponse.json({ error: "The photo is larger than 4 MB." }, { status: 400 });
+    }
+    const buffer = Buffer.from(await photo.arrayBuffer());
+    const [img] = await db
+      .insert(images)
+      .values({ mime: photo.type, data: buffer.toString("base64") })
+      .returning({ id: images.id });
+    staleImageId = existing.imageId;
+    imageId = img.id;
+  } else if (removePhoto && existing.imageId) {
+    staleImageId = existing.imageId;
+    imageId = null;
+  }
+
+  await db
     .update(questions)
     .set({
       text,
@@ -115,18 +151,20 @@ export async function PATCH(req: NextRequest) {
       optionD: optionD || null,
       correct,
       explanation,
+      imageId,
     })
-    .where(eq(questions.id, id))
-    .returning({ id: questions.id });
-  if (updated.length === 0) {
-    return NextResponse.json({ error: "Question not found." }, { status: 404 });
+    .where(eq(questions.id, id));
+
+  if (staleImageId) {
+    await db.delete(images).where(eq(images.id, staleImageId));
   }
-  return NextResponse.json({ ok: true });
+
+  return NextResponse.json({ ok: true, imageId });
 }
 
 /** Bulk delete: by explicit question ids, or every question in a chapter. */
 export async function DELETE(req: NextRequest) {
-  if (!checkAdminPasscode(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
   const body = await req.json().catch(() => null);

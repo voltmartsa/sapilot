@@ -1,20 +1,25 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
+/**
+ * Legacy context kept so admin pages/components that were built around the old
+ * shared-passcode flow (and still pass `headers` into their fetch calls) keep
+ * working unchanged. Auth is now a real session cookie sent automatically with
+ * every same-origin request, so there's nothing meaningful to put in `headers`
+ * — it's an empty object, present only for backward compatibility.
+ */
 type AdminContextValue = {
   passcode: string;
   headers: HeadersInit;
 };
 
-const AdminContext = createContext<AdminContextValue | null>(null);
+const AdminContext = createContext<AdminContextValue>({ passcode: "", headers: {} });
 
 export function useAdmin() {
-  const ctx = useContext(AdminContext);
-  if (!ctx) throw new Error("useAdmin must be used inside AdminShell");
-  return ctx;
+  return useContext(AdminContext);
 }
 
 const NAV = [
@@ -23,102 +28,29 @@ const NAV = [
   { href: "/admin/flagged", label: "Flagged questions" },
   { href: "/admin/questionbank", label: "Question bank" },
   { href: "/admin/upload", label: "Upload" },
+  { href: "/admin/resources", label: "Resources" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/subjects", label: "Subjects" },
+  { href: "/admin/schools", label: "Schools" },
+  { href: "/admin/settings", label: "Settings" },
 ] as const;
-
-const STORAGE_KEY = "sapilot-admin-passcode";
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [passcode, setPasscode] = useState<string | null>(null);
-  const [input, setInput] = useState("");
-  const [checking, setChecking] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      // Verify the stored passcode quietly.
-      fetch("/api/admin/stats", { headers: { "x-admin-passcode": saved } })
-        .then((r) => {
-          if (r.ok) setPasscode(saved);
-          else window.localStorage.removeItem(STORAGE_KEY);
-        })
-        .catch(() => {})
-        .finally(() => setChecking(false));
-    } else {
-      setChecking(false);
-    }
-  }, []);
-
-  async function unlock(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/stats", {
-        headers: { "x-admin-passcode": input },
-      });
-      if (!res.ok) {
-        setError("Incorrect passcode.");
-        return;
-      }
-      window.localStorage.setItem(STORAGE_KEY, input);
-      setPasscode(input);
-    } catch {
-      setError("Could not reach the server.");
-    }
-  }
-
-  if (checking) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-20 text-center text-sm text-ink-soft">
-        Opening the instructor portal…
-      </div>
-    );
-  }
-
-  if (!passcode) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-20 sm:px-6">
-        <form
-          onSubmit={unlock}
-          className="rounded-lg border border-line bg-white p-8 shadow-sm"
-        >
-          <h1 className="font-display text-2xl font-semibold text-navy-900">
-            Instructor portal
-          </h1>
-          <p className="mt-2 text-sm text-ink-soft">
-            Enter the instructor passcode to manage the question bank, exams and users.
-          </p>
-          <input
-            type="password"
-            required
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Instructor passcode"
-            className="mt-5 w-full rounded border border-line bg-white px-3 py-2.5 text-sm focus:border-navy-700 focus:outline-none"
-          />
-          {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
-          <button
-            type="submit"
-            className="mt-5 w-full rounded bg-navy-900 px-5 py-3 text-sm font-semibold text-white hover:bg-navy-800"
-          >
-            Unlock
-          </button>
-        </form>
-      </div>
-    );
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/");
+    router.refresh();
   }
 
   return (
-    <AdminContext.Provider
-      value={{ passcode, headers: { "x-admin-passcode": passcode } }}
-    >
+    <AdminContext.Provider value={{ passcode: "", headers: {} }}>
       <div className="mx-auto flex max-w-7xl gap-0 px-0 sm:px-4 lg:px-6">
         <aside className="hidden w-56 shrink-0 border-r border-line py-8 pr-4 md:block">
           <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-600">
-            Instructor portal
+            Super admin
           </p>
           <nav className="mt-3 space-y-1">
             {NAV.map((item) => {
@@ -143,14 +75,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </nav>
           <button
             type="button"
-            onClick={() => {
-              window.localStorage.removeItem(STORAGE_KEY);
-              setPasscode(null);
-              setInput("");
-            }}
+            onClick={() => void signOut()}
             className="mt-6 px-3 text-xs font-semibold text-ink-soft hover:text-red-600"
           >
-            Lock portal
+            Sign out
           </button>
         </aside>
 

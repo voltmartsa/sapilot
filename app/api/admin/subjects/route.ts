@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chapters, qualifications, questions, subjects } from "@/lib/db/schema";
-import { checkAdminPasscode } from "@/lib/admin";
+import { checkAdminAuth } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
 /** Full subject/chapter tree with exam settings, for the admin Subjects & Exams pages. */
 export async function GET(req: NextRequest) {
-  if (!checkAdminPasscode(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
 
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 
 /** Update a subject's details or exam configuration, or rename a chapter. */
 export async function PATCH(req: NextRequest) {
-  if (!checkAdminPasscode(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
   const body = await req.json().catch(() => null);

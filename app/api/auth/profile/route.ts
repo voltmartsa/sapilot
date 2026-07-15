@@ -15,6 +15,7 @@ export async function GET() {
       email: users.email,
       name: users.name,
       baseAirport: users.baseAirport,
+      leaderboardOptIn: users.leaderboardOptIn,
       createdAt: users.createdAt,
     })
     .from(users)
@@ -27,7 +28,7 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
   const body = await req.json().catch(() => null);
-  const patch: { name?: string; baseAirport?: string } = {};
+  const patch: { name?: string; baseAirport?: string; leaderboardOptIn?: boolean } = {};
 
   if (body?.name !== undefined) {
     const name = String(body.name).trim();
@@ -45,6 +46,9 @@ export async function PATCH(req: NextRequest) {
       );
     }
     patch.baseAirport = code;
+  }
+  if (body?.leaderboardOptIn !== undefined) {
+    patch.leaderboardOptIn = !!body.leaderboardOptIn;
   }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });

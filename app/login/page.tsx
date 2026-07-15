@@ -10,7 +10,7 @@ export default async function LoginPage({
   const { next } = await searchParams;
   return (
     <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
-      <AuthForm mode="login" next={next ?? "/dashboard"} />
+      <AuthForm mode="login" next={next} />
     </div>
   );
 }

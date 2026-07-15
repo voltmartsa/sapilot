@@ -34,7 +34,9 @@ export function useDashboard() {
   return ctx;
 }
 
-const NAV = [
+type NavItem = { href: string; label: string; icon: string; schoolOnly?: boolean };
+
+const NAV: NavItem[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
@@ -51,16 +53,32 @@ const NAV = [
     icon: "M10 2a8 8 0 108 8 8 8 0 00-8-8zm0 3v5l3 2",
   },
   {
+    href: "/dashboard/flights",
+    label: "Flights",
+    icon: "M2 11l16-6-4 6 4 6-16-6zm0 0h9",
+    schoolOnly: true,
+  },
+  {
+    href: "/dashboard/tools",
+    label: "Tools",
+    icon: "M12.5 3.5a3 3 0 00-4 4L3 13v3h3l5.5-5.5a3 3 0 004-4L13 9l-2-2z",
+  },
+  {
     href: "/dashboard/saved",
     label: "Saved questions",
     icon: "M6 2.5h8a.5.5 0 01.5.5v13.4a.3.3 0 01-.48.24L10 13l-4.02 3.64a.3.3 0 01-.48-.24V3a.5.5 0 01.5-.5z",
+  },
+  {
+    href: "/dashboard/social",
+    label: "Social",
+    icon: "M7 9.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM14 9.5a2 2 0 100-4 2 2 0 000 4zM2.5 16c.3-2.6 2.2-4.5 4.5-4.5s4.2 1.9 4.5 4.5M11.8 12c1.9.3 3.4 1.9 3.7 4",
   },
   {
     href: "/dashboard/settings",
     label: "Settings",
     icon: "M10 6.5a3.5 3.5 0 103.5 3.5A3.5 3.5 0 0010 6.5zm7 3.5l-1.6-.4a5.6 5.6 0 00-.5-1.2l.9-1.4-1.8-1.8-1.4.9a5.6 5.6 0 00-1.2-.5L11 4H9l-.4 1.6a5.6 5.6 0 00-1.2.5L6 5.2 4.2 7l.9 1.4a5.6 5.6 0 00-.5 1.2L3 10l1.6.4a5.6 5.6 0 00.5 1.2l-.9 1.4L6 14.8l1.4-.9a5.6 5.6 0 001.2.5L9 16h2l.4-1.6a5.6 5.6 0 001.2-.5l1.4.9 1.8-1.8-.9-1.4a5.6 5.6 0 00.5-1.2z",
   },
-] as const;
+];
 
 const STORAGE_KEY = "sapilot-active-subject";
 
@@ -69,6 +87,22 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [groups, setGroups] = useState<SubjectGroup[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [activeSubjectId, setActiveSubjectIdState] = useState<number | null>(null);
+  const [hasSchool, setHasSchool] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setHasSchool(!!d.user?.schoolId);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const navItems = useMemo(() => NAV.filter((item) => !item.schoolOnly || hasSchool), [hasSchool]);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,7 +148,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         {/* Sidebar */}
         <aside className="hidden w-56 shrink-0 border-r border-line py-8 pr-4 md:block">
           <nav className="space-y-1">
-            {NAV.map((item) => {
+            {navItems.map((item) => {
               const active =
                 item.href === "/dashboard"
                   ? pathname === "/dashboard"
@@ -200,7 +234,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
           {/* Mobile nav */}
           <nav className="mb-6 flex gap-1 overflow-x-auto md:hidden">
-            {NAV.map((item) => {
+            {navItems.map((item) => {
               const active =
                 item.href === "/dashboard"
                   ? pathname === "/dashboard"

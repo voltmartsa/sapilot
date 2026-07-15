@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, inArray, isNotNull, and } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chapters, images, questions } from "@/lib/db/schema";
+import { isSuperAdmin, passcodeIsValid } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const passcode = String(body?.passcode ?? "");
-  if (!process.env.ADMIN_PASSCODE || passcode !== process.env.ADMIN_PASSCODE) {
+  if (!passcodeIsValid(passcode) && !(await isSuperAdmin())) {
     return NextResponse.json({ error: "Invalid passcode." }, { status: 401 });
   }
   const chapterId = Number(body?.chapterId);
